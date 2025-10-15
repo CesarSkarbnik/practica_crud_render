@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es" class="theme-light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Inventario CRUD{% endblock %} | Motocicletas</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    
+    <script defer src="https://use.fontawesome.com/releases/v5.15.4/js/all.js"></script>
+
+    <style>
+        /* Estilos básicos para el header */
+        .header-bg {
+            background-color: #363636; /* Gris oscuro */
+            padding: 1.5rem 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem; /* Espacio después del header */
+        }
+        
+        /* Estilo para que las tarjetas se vean mejor */
+        .card.is-rounded {
+            border-radius: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card.is-rounded:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Colores de fondo */
+        .background-color {
+            background-color: gainsboro; 
+        }
+
+        /* Estilo para el botón de "Agregar Nueva Moto" */
+        .is-success-dark {
+            background-color: #257953 !important;
+            border-color: #257953 !important;
+            color: #fff;
+        }
+
+        .is-success-dark:hover {
+            background-color: #1f6445 !important;
+        }
+    </style>
+</head>
+<body class="background-color">
+
+    <header class="header-bg">
+        <div class="container">
+            <h1 class="title has-text-centered has-text-warning is-size-1">
+                {% block header_title %}Inventario de Motocicletas{% endblock %}
+            </h1>
+        </div>
+    </header>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="columns is-centered">
+                    <div class="column is-half">
+                        {% for category, message in messages %}
+                            <div class="notification is-{{ category }} is-light">
+                                <button class="delete notification_delete"></button>
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="box p-5 is-shadowless">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            (document.querySelectorAll('.notification_delete') || []).forEach(($delete) => {
+                const $notification = $delete.parentNode;
+
+                $delete.addEventListener('click', () => {
+                    $notification.parentNode.removeChild($notification);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

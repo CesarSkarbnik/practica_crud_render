@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="columns is-centered mb-5">
+    <div class="column is-narrow">
+        <!-- Botón de creación -->
+        <a href="{{ url_for('crear_moto') }}" class="button is-large is-success-dark">
+            <span class="icon is-medium">
+                <i class="fas fa-plus"></i>
+            </span>
+            <span>Agregar Nueva Moto</span>
+        </a>
+    </div>
+</div>
+
+<div class="columns is-multiline">
+    {% if motos %}
+        {% for moto in motos %}
+            <!-- Card para cada motocicleta -->
+            <div class="column is-one-quarter-desktop is-half-tablet is-full-mobile">
+                <div class="card is-rounded">
+                    <div class="card-content">
+                        <div class="media">
+                            <div class="media-content">
+                                <!-- Marca y Modelo -->
+                                <p class="title is-4 has-text-primary">
+                                    {{ moto.marca.nombre if moto.marca else 'Sin Marca' }}
+                                </p>
+                                <p class="subtitle is-6 has-text-grey">
+                                    Modelo: <strong>{{ moto.modelo }}</strong>
+                                </p>
+                            </div>
+                            <div class="media-right">
+                                <!-- Icono -->
+                                <span class="icon is-large has-text-danger">
+                                    <i class="fas fa-motorcycle fa-2x"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="content">
+                            <!-- Detalles -->
+                            <p class="is-size-5 mb-1">
+                                <strong>Año:</strong> {{ moto.anio }}
+                            </p>
+                            <p class="is-size-5 mb-4">
+                                <strong>Precio:</strong> <span class="has-text-weight-bold has-text-success-dark">${{ "{:,.2f}".format(moto.precio) }}</span>
+                            </p>
+
+                            <!-- Acciones (Botones de Editar/Eliminar) -->
+                            <div class="field is-grouped is-grouped-centered">
+                                <!-- Editar -->
+                                <p class="control">
+                                    <a href="{{ url_for('editar_moto', id=moto.id) }}" class="button is-link is-small">
+                                        <span class="icon is-small"><i class="fas fa-edit"></i></span>
+                                        <span>Editar</span>
+                                    </a>
+                                </p>
+
+                                <!-- Eliminar (con formulario POST) -->
+                                <p class="control">
+                                    <form method="POST" action="{{ url_for('eliminar_moto', id=moto.id) }}" onsubmit="return confirm('¿Estás seguro de que quieres eliminar la moto {{ moto.modelo }}?')">
+                                        <button type="submit" class="button is-danger is-small">
+                                            <span class="icon is-small"><i class="fas fa-trash-alt"></i></span>
+                                            <span>Eliminar</span>
+                                        </button>
+                                    </form>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <!-- Mensaje si no hay motos -->
+        <div class="column is-full has-text-centered">
+            <div class="notification is-info is-light">
+                <p class="title is-4">No hay motocicletas en el inventario.</p>
+                <p class="subtitle is-6">Usa el botón "Agregar Nueva Moto" para comenzar.</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
