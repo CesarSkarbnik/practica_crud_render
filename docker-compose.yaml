@@ -28,7 +28,10 @@ services:
       - red_publica
       - red_bd_aislada
     deploy:
-      replicas: 3
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == worker # <--- Fuerza el despliegue solo en Worker-1 y Worker-2
       restart_policy:
         condition: on-failure
 
