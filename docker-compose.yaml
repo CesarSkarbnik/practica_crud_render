@@ -33,10 +33,14 @@ services:
         condition: on-failure
 
 networks:
-  red_publica:
-    driver: overlay
+  # Red interna administrada por el propio Stack
   red_bd_aislada:
     driver: overlay
+
+  # Red externa creada previamente por tu script de Jenkins
+  red_publica:
+    name: stack-motos_red_publica
+    external: true
 
 volumes:
   db_data:
