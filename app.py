@@ -9,7 +9,7 @@ load_dotenv()
 # --- Configuración de Flask ---
 app = Flask(__name__)
 
-# Configuración de la DB usando la variable de entorno DATABASE_URL (Render/Local)
+# Configuración de la DB usando la variable de entorno DATABASE_URL
 db_url = os.environ.get('DATABASE_URL')
 if db_url and db_url.startswith("postgres://"):
     # SQLAlchemy requiere la modificación del esquema 'postgres://' a 'postgresql://'
@@ -19,16 +19,17 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'una-clave-secreta-debe-estar-en-el-env')
 
-# Configuración para forzar SSL: Esta es la corrección clave para evitar el OperationalError
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'connect_args': {'sslmode': 'require'}
-}
+# --- CORRECCIÓN 1: SSL DINÁMICO ---
+# Solo exige SSL si NO estás conectado al contenedor local llamado 'db'
+if db_url and "@db:" not in db_url:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {'sslmode': 'require'}
+    }
 
 db = SQLAlchemy(app)
 
 # --- Modelos de Base de Datos ---
 
-# Modelo para la tabla 'marcas'
 class Marca(db.Model):
     __tablename__ = 'marcas' 
     id = db.Column(db.Integer, primary_key=True)
@@ -38,7 +39,6 @@ class Marca(db.Model):
     def __repr__(self):
         return f'<Marca {self.nombre}>'
 
-# Modelo para la tabla 'motos'
 class Motocicleta(db.Model):
     __tablename__ = 'motos' 
     id = db.Column(db.Integer, primary_key=True)
@@ -51,32 +51,29 @@ class Motocicleta(db.Model):
         return f'<Motocicleta {self.modelo} ({self.anio})>'
 
 
+# --- CORRECCIÓN 2: CREACIÓN DE TABLAS GLOBAL ---
+# Esto garantiza que Gunicorn cree las tablas en Docker Swarm al arrancar la app
+with app.app_context():
+    db.create_all() 
+
+
 # --- Rutas CRUD ---
 
 @app.route('/')
 def index():
-    """Ruta de inicio que redirige a la lista de motocicletas."""
     return redirect(url_for('listar_motos'))
 
-# [R] READ: Listar todas las motocicletas
 @app.route('/motos')
 def listar_motos():
-    """Muestra una lista de todas las motos en el inventario, usando la vista de tarjetas."""
     motos = Motocicleta.query.all()
-    # Renderiza la plantilla de tarjetas (lista_motos_cards.html)
     return render_template('lista_motos_cards.html', motos=motos, title="Inventario Principal")
 
-# [C] CREATE: Agregar una nueva motocicleta
 @app.route('/motos/nueva', methods=['GET', 'POST'])
 def crear_moto():
-    """Maneja la creación de una nueva moto."""
     marcas = Marca.query.order_by(Marca.nombre).all()
-    
     if request.method == 'POST':
         try:
-            # Aquí asumimos que los datos del formulario son correctos (Marca, Modelo, Año, Precio)
             nueva_moto = Motocicleta(
-                # Manejamos el caso de que marca_id sea None/vacío
                 marca_id=request.form.get('marca_id') if request.form.get('marca_id') else None,
                 modelo=request.form['modelo'],
                 anio=int(request.form['anio']),
@@ -91,23 +88,15 @@ def crear_moto():
         except Exception as e:
             flash(f'Error al guardar la moto: {e}', 'danger')
             
-    # CORRECCIÓN CLAVE: Llama al archivo renombrado 'formulario_moto.html'
-    return render_template('formulario_moto.html', 
-                           accion='Crear', 
-                           marcas=marcas,
-                           title="Crear Nueva Moto")
+    return render_template('formulario_moto.html', accion='Crear', marcas=marcas, title="Crear Nueva Moto")
 
-# [U] UPDATE: Editar una motocicleta existente
 @app.route('/motos/editar/<int:id>', methods=['GET', 'POST'])
 def editar_moto(id):
-    """Maneja la edición de una moto existente por ID."""
     moto = Motocicleta.query.get_or_404(id)
     marcas = Marca.query.order_by(Marca.nombre).all()
 
     if request.method == 'POST':
         try:
-            # Aquí asumimos que los datos del formulario son correctos
-            # Manejamos el caso de que marca_id sea None/vacío
             moto.marca_id = request.form.get('marca_id') if request.form.get('marca_id') else None
             moto.modelo = request.form['modelo']
             moto.anio = int(request.form['anio'])
@@ -121,19 +110,11 @@ def editar_moto(id):
         except Exception as e:
             flash(f'Error al actualizar la moto: {e}', 'danger')
 
-    # CORRECCIÓN CLAVE: Llama al archivo renombrado 'formulario_moto.html'
-    return render_template('formulario_moto.html', 
-                           accion='Editar', 
-                           moto=moto, 
-                           marcas=marcas,
-                           title=f"Editar {moto.modelo}")
+    return render_template('formulario_moto.html', accion='Editar', moto=moto, marcas=marcas, title=f"Editar {moto.modelo}")
 
-# [D] DELETE: Eliminar una motocicleta
 @app.route('/motos/eliminar/<int:id>', methods=['POST'])
 def eliminar_moto(id):
-    """Maneja la eliminación de una moto por ID."""
     moto = Motocicleta.query.get_or_404(id)
-    
     try:
         db.session.delete(moto)
         db.session.commit()
@@ -145,8 +126,4 @@ def eliminar_moto(id):
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        # Crea las tablas si no existen.
-        db.create_all() 
-    
     app.run(debug=True)
