@@ -7,21 +7,19 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configuración directa y limpia para Docker Swarm
-db_url = os.environ.get('DATABASE_URL', 'postgresql://cesar:tu_password_seguro@db:5432/db_motos')
+# Configuración de la URL de la base de datos para Kubernetes
+db_url = os.environ.get('DATABASE_URL', 'postgresql://postgres:admin1234@dbpostgres:5432/motos')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'una-clave-secreta-debe-estar-en-el-env'
-
-# Quitamos cualquier configuración extra de SSL que pueda bloquear el clúster
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {}
+app.config['SECRET_KEY'] = 'clave-secreta-para-sesiones-de-motos'
 
 db = SQLAlchemy(app)
 
-# --- Modelos de Base de Datos ---
+# --- Modelos del Inventario de Motos ---
+
 class Marca(db.Model):
     __tablename__ = 'marcas' 
     id = db.Column(db.Integer, primary_key=True)
@@ -36,27 +34,38 @@ class Motocicleta(db.Model):
     precio = db.Column(db.Float, nullable=False)
     marca_id = db.Column(db.Integer, db.ForeignKey('marcas.id', ondelete='SET NULL'), nullable=True)
 
-# --- CREACIÓN FORZADA DE TABLAS AL ARRANCAR ---
-# Como no tenemos SSH, obligamos a Flask a crear todo antes de recibir peticiones
-with app.app_context():
+
+# --- 🛠️ RUTA DE EMERGENCIA PARA CREAR TABLAS EN KUBERNETES ---
+@app.route('/init-db')
+def inicializar_base_datos():
     try:
         db.create_all()
+        return "<h1>✅ ¡Tablas 'motos' y 'marcas' creadas exitosamente en Postgres!</h1><br><a href='/motos'>👉 Ir al Inventario de Motos</a>"
     except Exception as e:
-        print(f"Error inicial: {e}")
+        return f"<h1>❌ Error al intentar crear las tablas:</h1><p>{str(e)}</p>"
 
-# --- Rutas CRUD ---
+
+# --- Rutas del Controlador CRUD ---
+
 @app.route('/')
 def index():
     return redirect(url_for('listar_motos'))
 
 @app.route('/motos')
 def listar_motos():
-    # CAPTURA DE ERRORES EN PANTALLA: Si falla, te dirá exactamente por qué
     try:
         motos = Motocicleta.query.all()
-        return render_template('lista_motos_cards.html', motos=motos, title="Inventario Principal")
-    except Exception as e:
-        return f"<h1>⚠️ Error de Diagnóstico en la Base de Datos:</h1><p>{str(e)}</p><br><small>Revisa que las credenciales del compose coincidan.</small>", 500
+        return render_template('lista_motos_cards.html', motos=motos, title="Inventario de Motocicletas")
+    except Exception as error_ejecucion:
+        # Si la tabla no existe o falla, muestra el botón de diagnóstico en pantalla
+        return f"""
+        <h2>⚠️ Error de Comunicación con Postgres (La tabla podría no existir):</h2>
+        <p>{str(error_ejecucion)}</p>
+        <br>
+        <a href='/init-db' style='padding:10px 20px; background-color:#28a745; color:white; text-decoration:none; border-radius:5px;'>
+            Presiona aquí para intentar Inicializar la Base de Datos (/init-db)
+        </a>
+        """, 500
 
 @app.route('/motos/nueva', methods=['GET', 'POST'])
 def crear_moto():
@@ -71,16 +80,15 @@ def crear_moto():
             )
             db.session.add(nueva_moto)
             db.session.commit()
-            flash('Motocicleta creada exitosamente.', 'success')
+            flash('Motocicleta agregada con éxito.', 'success')
             return redirect(url_for('listar_motos'))
         except Exception as e:
-            flash(f'Error: {e}', 'danger')
+            flash(f'Error al procesar el formulario: {e}', 'danger')
             
-    return render_template('formulario_moto.html', accion='Crear', marcas=marcas, title="Crear Nueva Moto")
+    return render_template('formulario_moto.html', accion='Crear', marcas=marcas, title="Agregar Moto")
 
-# Mantener las rutas de editar y eliminar simples
 @app.route('/motos/editar/<int:id>', methods=['GET', 'POST'])
-def editar_moto(id):
+def edit_moto(id):
     moto = Motocicleta.query.get_or_404(id)
     marcas = Marca.query.order_by(Marca.nombre).all()
     if request.method == 'POST':
@@ -96,7 +104,7 @@ def editar_moto(id):
     return render_template('formulario_moto.html', accion='Editar', moto=moto, marcas=marcas, title=f"Editar {moto.modelo}")
 
 @app.route('/motos/eliminar/<int:id>', methods=['POST'])
-def eliminar_moto(id):
+def delete_moto(id):
     moto = Motocicleta.query.get_or_404(id)
     try:
         db.session.delete(moto)
