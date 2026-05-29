@@ -19,8 +19,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'una-clave-secreta-debe-estar-en-el-env')
 
-# --- CORRECCIÓN 1: SSL DINÁMICO ---
-# Solo exige SSL si NO estás conectado al contenedor local llamado 'db'
+# SSL inteligente: Solo lo exige si NO estás conectado al contenedor local 'db' de Swarm
 if db_url and "@db:" not in db_url:
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'connect_args': {'sslmode': 'require'}
@@ -51,26 +50,29 @@ class Motocicleta(db.Model):
         return f'<Motocicleta {self.modelo} ({self.anio})>'
 
 
-# --- CORRECCIÓN 2: CREACIÓN DE TABLAS GLOBAL ---
-# Esto garantiza que Gunicorn cree las tablas en Docker Swarm al arrancar la app
-with app.app_context():
-    db.create_all() 
-
-
 # --- Rutas CRUD ---
 
 @app.route('/')
 def index():
+    """Ruta de inicio que redirige a la lista de motocicletas."""
     return redirect(url_for('listar_motos'))
 
 @app.route('/motos')
 def listar_motos():
-    motos = Motocicleta.query.all()
+    """Muestra una lista de todas las motos en el inventario."""
+    try:
+        motos = Motocicleta.query.all()
+    except Exception:
+        # Si las tablas no existen en la primera consulta, las creamos en caliente
+        with app.app_context():
+            db.create_all()
+        motos = Motocicleta.query.all()
     return render_template('lista_motos_cards.html', motos=motos, title="Inventario Principal")
 
 @app.route('/motos/nueva', methods=['GET', 'POST'])
 def crear_moto():
     marcas = Marca.query.order_by(Marca.nombre).all()
+    
     if request.method == 'POST':
         try:
             nueva_moto = Motocicleta(
@@ -126,4 +128,7 @@ def eliminar_moto(id):
 
 
 if __name__ == '__main__':
+    # Creación automática de tablas solo en entorno local de desarrollo
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)

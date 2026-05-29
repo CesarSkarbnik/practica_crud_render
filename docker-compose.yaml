@@ -31,16 +31,16 @@ services:
       replicas: 2
       placement:
         constraints:
-          - node.role == worker # <--- Fuerza el despliegue solo en Worker-1 y Worker-2
+          - node.role == worker
       restart_policy:
         condition: on-failure
 
 networks:
-  # Red interna administrada por el propio Stack
+  # Red interna para comunicar Flask con Postgres
   red_bd_aislada:
     driver: overlay
 
-  # Red externa creada previamente por tu script de Jenkins
+  # Red externa creada automáticamente por tu script de Jenkins
   red_publica:
     name: stack-motos_red_publica
     external: true
