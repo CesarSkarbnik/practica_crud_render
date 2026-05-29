@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: cesar
+      POSTGRES_PASSWORD: tu_password_seguro
+      POSTGRES_DB: db_motos
+    networks:
+      - red_bd_aislada
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == Worker-1
+      restart_policy:
+        condition: on-failure
+
+  web:
+    image: cesartellez301/motos:latest
+    ports:
+      - "8009:5000"
+    environment:
+      DATABASE_URL: postgresql://cesar:tu_password_seguro@db:5432/db_motos
+    networks:
+      - red_publica
+      - red_bd_aislada
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+
+networks:
+  red_publica:
+    driver: overlay
+  red_bd_aislada:
+    driver: overlay
+
+volumes:
+  db_data:
