@@ -8,9 +8,9 @@ services:
       POSTGRES_PASSWORD: tu_password_seguro
       POSTGRES_DB: db_motos
     networks:
-      - red_bd_aislada
+      - red_compartida
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data_motos:/var/lib/postgresql/data
     deploy:
       placement:
         constraints:
@@ -25,8 +25,8 @@ services:
     environment:
       DATABASE_URL: postgresql://cesar:tu_password_seguro@db:5432/db_motos
     networks:
+      - red_compartida
       - red_publica
-      - red_bd_aislada
     deploy:
       replicas: 2
       placement:
@@ -36,14 +36,12 @@ services:
         condition: on-failure
 
 networks:
-  # Red interna para comunicar Flask con Postgres
-  red_bd_aislada:
+  # Una sola red interna controlada por el Stack para evitar fallos de traducción de host
+  red_compartida:
     driver: overlay
-
-  # Red externa creada automáticamente por tu script de Jenkins
   red_publica:
     name: stack-motos_red_publica
     external: true
 
 volumes:
-  db_data:
+  db_data_motos:
